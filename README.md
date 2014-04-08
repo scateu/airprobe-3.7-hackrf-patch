@@ -7,13 +7,14 @@ However, neeo from the comments section of this post has created a [patch](http:
 
 
 ## Install libosmocore
-        git clone git://git.osmocom.org/libosmocore.git
-        cd libosmocore
-        autoreconf –i
-        ./configure
-        make
-        sudo make install
-        sudo ldconfig
+
+    git clone git://git.osmocom.org/libosmocore.git
+    cd libosmocore
+    autoreconf –i
+    ./configure
+    make
+    sudo make install
+    sudo ldconfig
 
 ## Install airprobe
 Only patch airprobe/gsm-receiver
