@@ -1,0 +1,296 @@
+diff --git a/gsm-receiver/Makefile.common b/gsm-receiver/Makefile.common
+index b5dcb2e..0592f70 100644
+--- a/gsm-receiver/Makefile.common
++++ b/gsm-receiver/Makefile.common
+@@ -28,7 +28,7 @@ AM_CPPFLAGS = \
+ 	$(STD_DEFINES_AND_INCLUDES) \
+ 	$(PYTHON_CPPFLAGS) \
+ 	$(CPPUNIT_INCLUDES) \
+-	$(GNURADIO_CORE_CPPFLAGS)
++	$(GNURADIO_RUNTIME_CPPFLAGS)
+ 
+ #!! remove this
+ TCH_DECODER_INCLUDEDIR = $(top_srcdir)/src/lib/decoder/openbtsstuff
+@@ -36,9 +36,8 @@ TCH_DECODER_INCLUDEDIR = $(top_srcdir)/src/lib/decoder/openbtsstuff
+ STD_DEFINES_AND_INCLUDES = \
+ 	-I$(DECODER_INCLUDEDIR) \
+ 	-I$(MAIN_INCLUDEDIR) \
+-	-I$(GNURADIO_CORE_INCLUDEDIR) \
+-	-I$(GNURADIO_CORE_INCLUDEDIR)/swig \
+-	-I$(GRUEL_INCLUDEDIR)/gruel/swig \
++	-I$(GNURADIO_RUNTIME_INCLUDEDIR) \
++	-I$(GNURADIO_RUNTIME_INCLUDEDIR)/gnuradio/swig \
+ 	$(LIBOSMOCORE_CFLAGS)  \
+ 	-I$(TCH_DECODER_INCLUDEDIR)
+ 
+diff --git a/gsm-receiver/config/gr_libgnuradio_core_extra_ldflags.m4 b/gsm-receiver/config/gr_libgnuradio_core_extra_ldflags.m4
+index 43f872c..92e8c97 100644
+--- a/gsm-receiver/config/gr_libgnuradio_core_extra_ldflags.m4
++++ b/gsm-receiver/config/gr_libgnuradio_core_extra_ldflags.m4
+@@ -20,21 +20,21 @@
+ # Boston, MA 02110-1301, USA.
+ 
+ dnl
+-AC_DEFUN([GR_LIBGNURADIO_CORE_EXTRA_LDFLAGS], [
++AC_DEFUN([GR_LIBGNURADIO_RUNTIME_EXTRA_LDFLAGS], [
+ AC_REQUIRE([AC_PROG_LD])
+ # on Mingw32 extra LDFLAGS are required to ease global variable linking
+-LIBGNURADIO_CORE_EXTRA_LDFLAGS=""
++LIBGNURADIO_RUNTIME_EXTRA_LDFLAGS=""
+ 
+ AC_MSG_CHECKING([whether $LD accepts --enable-runtime-pseudo-reloc])
+ if ${LD} --enable-runtime-pseudo-reloc --version >/dev/null 2>&1
+ then
+         # libtool requires the quotes
+-        LIBGNURADIO_CORE_EXTRA_LDFLAGS="\"-Wl,--enable-runtime-pseudo-reloc\""
++        LIBGNURADIO_RUNTIME_EXTRA_LDFLAGS="\"-Wl,--enable-runtime-pseudo-reloc\""
+         AC_MSG_RESULT(yes)
+ else
+         AC_MSG_RESULT(no)
+ fi
+ 
+-AC_SUBST(LIBGNURADIO_CORE_EXTRA_LDFLAGS)
++AC_SUBST(LIBGNURADIO_RUNTIME_EXTRA_LDFLAGS)
+ 
+ ])
+diff --git a/gsm-receiver/config/gr_standalone.m4 b/gsm-receiver/config/gr_standalone.m4
+index 4e097d2..6a1594b 100644
+--- a/gsm-receiver/config/gr_standalone.m4
++++ b/gsm-receiver/config/gr_standalone.m4
+@@ -114,7 +114,6 @@ m4_define([GR_STANDALONE],
+   AC_CHECK_PROG([XMLTO],[xmlto],[yes],[])
+   AM_CONDITIONAL([HAS_XMLTO], [test x$XMLTO = xyes])
+ 
+-  PKG_CHECK_MODULES(GNURADIO_CORE, gnuradio-core >= 3)
+-  LIBS="$LIBS $GNURADIO_CORE_LIBS"
+-  PKG_CHECK_MODULES(GRUEL, gruel >= 3)
++  PKG_CHECK_MODULES(GNURADIO_RUNTIME, gnuradio-runtime >= 3.7)
++  LIBS="$LIBS $GNURADIO_RUNTIME_LIBS"
+ ])
+diff --git a/gsm-receiver/src/lib/Makefile.swig.gen b/gsm-receiver/src/lib/Makefile.swig.gen
+index 20074ef..60e806d 100644
+--- a/gsm-receiver/src/lib/Makefile.swig.gen
++++ b/gsm-receiver/src/lib/Makefile.swig.gen
+@@ -250,9 +250,3 @@ $(DEPDIR)/gsm-generate-stamp:
+ ## to continue.
+ ##
+ 	touch $(DEPDIR)/gsm-generate-stamp
+-
+-# KLUDGE: Force runtime include of a SWIG dependency file.  This is
+-# not guaranteed to be portable, but will probably work.  If it works,
+-# we have accurate dependencies for our swig stuff, which is good.
+-
+-@am__include@ @am__quote@./$(DEPDIR)/gsm.d@am__quote@
+diff --git a/gsm-receiver/src/lib/gsm.i b/gsm-receiver/src/lib/gsm.i
+index b3c1d81..8c97921 100644
+--- a/gsm-receiver/src/lib/gsm.i
++++ b/gsm-receiver/src/lib/gsm.i
+@@ -33,7 +33,8 @@
+ /* %include "gsm_constants.h" */
+ 
+ %{
+-#include "gnuradio_swig_bug_workaround.h"	// mandatory bug fix
++#include <gnuradio_swig_bug_workaround.h>	// mandatory bug fix
++#include <gnuradio/py_feval.h>
+ #include "gsm_receiver_cf.h"
+ #include <stdexcept>
+ /* #include "gsm_constants.h" */
+@@ -43,12 +44,12 @@
+ 
+ GR_SWIG_BLOCK_MAGIC(gsm,receiver_cf);
+ 
+-gsm_receiver_cf_sptr gsm_make_receiver_cf ( gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration);
++gsm_receiver_cf_sptr gsm_make_receiver_cf ( gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration);
+ 
+-class gsm_receiver_cf : public gr_block
++class gsm_receiver_cf : public gr::block
+ {
+ private:
+-  gsm_receiver_cf ( gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr);
++  gsm_receiver_cf ( gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr);
+ };
+ 
+ // ----------------------------------------------------------------
+diff --git a/gsm-receiver/src/lib/gsm_constants.h b/gsm-receiver/src/lib/gsm_constants.h
+index b4b8678..39ea1d4 100644
+--- a/gsm-receiver/src/lib/gsm_constants.h
++++ b/gsm-receiver/src/lib/gsm_constants.h
+@@ -30,7 +30,7 @@
+ 
+ #define FCCH_HITS_NEEDED        (USEFUL_BITS - 4)
+ #define FCCH_MAX_MISSES         1
+-#define FCCH_MAX_FREQ_OFFSET    100
++#define FCCH_MAX_FREQ_OFFSET    20000
+ 
+ #define CHAN_IMP_RESP_LENGTH  5
+ 
+diff --git a/gsm-receiver/src/lib/gsm_receiver_cf.cc b/gsm-receiver/src/lib/gsm_receiver_cf.cc
+index b4e7a69..6bfdf5d 100644
+--- a/gsm-receiver/src/lib/gsm_receiver_cf.cc
++++ b/gsm-receiver/src/lib/gsm_receiver_cf.cc
+@@ -24,8 +24,8 @@
+ #include "config.h"
+ #endif
+ 
+-#include <gr_io_signature.h>
+-#include <gr_math.h>
++#include <gnuradio/io_signature.h>
++#include <gnuradio/math.h>
+ #include <math.h>
+ #include <Assert.h>
+ #include <boost/circular_buffer.hpp>
+@@ -289,7 +289,7 @@ typedef std::vector<float> vector_float;
+ typedef boost::circular_buffer<float> circular_buffer_float;
+ 
+ gsm_receiver_cf_sptr
+-gsm_make_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration)
++gsm_make_receiver_cf(gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration)
+ {
+   return gsm_receiver_cf_sptr(new gsm_receiver_cf(tuner, synchronizer, osr, key, configuration));
+ }
+@@ -302,10 +302,10 @@ static const int MAX_OUT = 1; // maximum number of output streams
+ /*
+  * The private constructor
+  */
+-gsm_receiver_cf::gsm_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration)
+-    : gr_block("gsm_receiver",
+-               gr_make_io_signature(MIN_IN, MAX_IN, sizeof(gr_complex)),
+-               gr_make_io_signature(MIN_OUT, MAX_OUT, 142 * sizeof(float))),
++gsm_receiver_cf::gsm_receiver_cf(gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration)
++    : gr::block("gsm_receiver",
++               gr::io_signature::make(MIN_IN, MAX_IN, sizeof(gr_complex)),
++               gr::io_signature::make(MIN_OUT, MAX_OUT, 142 * sizeof(float))),
+     d_OSR(osr),
+     d_chan_imp_length(CHAN_IMP_RESP_LENGTH),
+     d_tuner(tuner),
+@@ -751,7 +751,7 @@ void gsm_receiver_cf::set_frequency(double freq_offset)
+ inline float gsm_receiver_cf::compute_phase_diff(gr_complex val1, gr_complex val2)
+ {
+   gr_complex conjprod = val1 * conj(val2);
+-  return gr_fast_atan2f(imag(conjprod), real(conjprod));
++  return gr::fast_atan2f(imag(conjprod), real(conjprod));
+ }
+ 
+ bool gsm_receiver_cf::reach_sch_burst(const int nitems)
+diff --git a/gsm-receiver/src/lib/gsm_receiver_cf.h b/gsm-receiver/src/lib/gsm_receiver_cf.h
+index 039a774..88a742a 100644
+--- a/gsm-receiver/src/lib/gsm_receiver_cf.h
++++ b/gsm-receiver/src/lib/gsm_receiver_cf.h
+@@ -24,9 +24,12 @@
+ 
+ #include <vector>
+ #include <list>
+-#include <gr_block.h>
+-#include <gr_complex.h>
+-#include <gr_feval.h>
++#include <gnuradio/block_gateway.h>
++#include <gnuradio/tagged_stream_block.h>
++#include <gnuradio/sync_decimator.h>
++#include <gnuradio/sync_interpolator.h>
++#include <gnuradio/gr_complex.h>
++#include <gnuradio/feval.h>
+ #include <gsm_constants.h>
+ #include <gsm_receiver_config.h>
+ 
+@@ -42,7 +45,7 @@ class gsm_receiver_cf;
+ typedef boost::shared_ptr<gsm_receiver_cf> gsm_receiver_cf_sptr;
+ typedef std::vector<gr_complex> vector_complex;
+ 
+-gsm_receiver_cf_sptr gsm_make_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration);
++gsm_receiver_cf_sptr gsm_make_receiver_cf(gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration);
+ 
+ /** GSM Receiver GNU Radio block
+  *
+@@ -52,7 +55,7 @@ gsm_receiver_cf_sptr gsm_make_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synch
+  * \ingroup block
+  */
+ 
+-class gsm_receiver_cf : public gr_block
++class gsm_receiver_cf : public gr::block
+ {
+   private:
+     std::map<char,int> d_hex_to_int;
+@@ -76,8 +79,8 @@ class gsm_receiver_cf : public gr_block
+     gr_complex d_sch_training_seq[N_SYNC_BITS]; ///<encoded training sequence of a SCH burst
+     gr_complex d_norm_training_seq[TRAIN_SEQ_NUM][N_TRAIN_BITS]; ///<encoded training sequences of a normal bursts and dummy bursts
+ 
+-    gr_feval_dd *d_tuner; ///<callback to a python object which is used for frequency tunning
+-    gr_feval_dd *d_synchronizer; ///<callback to a python object which is used to correct offset of USRP's internal clock
++    gr::feval_dd *d_tuner; ///<callback to a python object which is used for frequency tunning
++    gr::feval_dd *d_synchronizer; ///<callback to a python object which is used to correct offset of USRP's internal clock
+ 
+     /** Countes samples consumed by the receiver
+      *
+@@ -120,8 +123,8 @@ class gsm_receiver_cf : public gr_block
+     // GSM Stack
+     GS_CTX d_gs_ctx;//TODO: remove it! it'a not right place for a decoder
+ 
+-    friend gsm_receiver_cf_sptr gsm_make_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration);
+-    gsm_receiver_cf(gr_feval_dd *tuner, gr_feval_dd *synchronizer, int osr, std::string key, std::string configuration);
++    friend gsm_receiver_cf_sptr gsm_make_receiver_cf(gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration);
++    gsm_receiver_cf(gr::feval_dd *tuner, gr::feval_dd *synchronizer, int osr, std::string key, std::string configuration);
+ 
+     /** Function whis is used to search a FCCH burst and to compute frequency offset before
+      * "synchronized" state of the receiver
+diff --git a/gsm-receiver/src/python/gsm_receive.py b/gsm-receiver/src/python/gsm_receive.py
+index e66ddf9..360aabc 100755
+--- a/gsm-receiver/src/python/gsm_receive.py
++++ b/gsm-receiver/src/python/gsm_receive.py
+@@ -1,7 +1,6 @@
+ #!/usr/bin/env python
+ 
+-from gnuradio import gr, gru, blks2
+-#, gsm
++from gnuradio import gr, gru, blocks, filter
+ from gnuradio.eng_option import eng_option
+ from optparse import OptionParser
+ from os import sys
+@@ -15,9 +14,9 @@ class tuner(gr.feval_dd):
+     def __init__(self, top_block):
+         gr.feval_dd.__init__(self)
+         self.top_block = top_block
+-    def eval(self, freq_offet):
+-        self.top_block.set_center_frequency(freq_offet)
+-        return freq_offet
++    def eval(self, freq_offset):
++        self.top_block.set_center_frequency(abs(freq_offset))
++        return abs(freq_offset)
+ 
+ class synchronizer(gr.feval_dd):
+     def __init__(self, top_block):
+@@ -48,12 +47,12 @@ class gsm_receiver_first_blood(gr.top_block):
+   
+     def _set_sink(self):
+         nazwa_pliku_wy = self.options.outputfile
+-        ujscie = gr.file_sink(gr.sizeof_float, nazwa_pliku_wy)
++        ujscie = blocks.file_sink(gr.sizeof_float, nazwa_pliku_wy)
+         return ujscie
+     
+     def _set_source(self):
+         nazwa_pliku = self.options.inputfile
+-        zrodlo = gr.file_source(gr.sizeof_gr_complex, nazwa_pliku, False)
++        zrodlo = blocks.file_source(gr.sizeof_gr_complex, nazwa_pliku, False)
+         return zrodlo
+     
+     def _set_rates(self):
+@@ -69,16 +68,16 @@ class gsm_receiver_first_blood(gr.top_block):
+         filter_t_width  = 10e3
+         offset = 0
+ #        print "input_rate:", self.input_rate, "sample rate:", self.sps, " filter_cutoff:", filter_cutoff, " filter_t_width:", filter_t_width
+-        filter_taps     = gr.firdes.low_pass(1.0, self.input_rate, filter_cutoff, filter_t_width, gr.firdes.WIN_HAMMING)
+-        filtr          = gr.freq_xlating_fir_filter_ccf(1, filter_taps, offset, self.input_rate)
++        filter_taps     = filter.firdes.low_pass(1.0, self.input_rate, filter_cutoff, filter_t_width, filter.firdes.WIN_HAMMING)
++        filtr          = filter.freq_xlating_fir_filter_ccf(1, filter_taps, offset, self.input_rate)
+         return filtr
+ 
+     def _set_converter(self):
+-        v2s = gr.vector_to_stream(gr.sizeof_float, 142)
++        v2s = blocks.vector_to_stream(gr.sizeof_float, 142)
+         return v2s
+     
+     def _set_interpolator(self):
+-        interpolator = gr.fractional_interpolator_cc(0, self.sps) 
++        interpolator = filter.fractional_resampler_cc(0, self.sps) 
+         return interpolator
+     
+     def _set_receiver(self):
