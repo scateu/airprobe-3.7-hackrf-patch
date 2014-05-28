@@ -233,7 +233,7 @@ index 039a774..88a742a 100644
      /** Function whis is used to search a FCCH burst and to compute frequency offset before
       * "synchronized" state of the receiver
 diff --git a/gsm-receiver/src/python/gsm_receive.py b/gsm-receiver/src/python/gsm_receive.py
-index e66ddf9..360aabc 100755
+index e66ddf9..0b9090c 100755
 --- a/gsm-receiver/src/python/gsm_receive.py
 +++ b/gsm-receiver/src/python/gsm_receive.py
 @@ -1,7 +1,6 @@
@@ -241,7 +241,7 @@ index e66ddf9..360aabc 100755
  
 -from gnuradio import gr, gru, blks2
 -#, gsm
-+from gnuradio import gr, gru, blocks, filter
++from gnuradio import gr, blocks, filter
  from gnuradio.eng_option import eng_option
  from optparse import OptionParser
  from os import sys
@@ -253,11 +253,20 @@ index e66ddf9..360aabc 100755
 -        self.top_block.set_center_frequency(freq_offet)
 -        return freq_offet
 +    def eval(self, freq_offset):
-+        self.top_block.set_center_frequency(abs(freq_offset))
-+        return abs(freq_offset)
++        self.top_block.set_center_frequency(freq_offset)
++        return freq_offset
  
  class synchronizer(gr.feval_dd):
      def __init__(self, top_block):
+@@ -26,7 +25,7 @@ class synchronizer(gr.feval_dd):
+ 
+     def eval(self, timing_offset):
+         self.top_block.set_timing(timing_offset)
+-        return freq_offet
++        return timing_offset
+ 
+ class gsm_receiver_first_blood(gr.top_block):
+     def __init__(self):
 @@ -48,12 +47,12 @@ class gsm_receiver_first_blood(gr.top_block):
    
      def _set_sink(self):
@@ -273,14 +282,20 @@ index e66ddf9..360aabc 100755
          return zrodlo
      
      def _set_rates(self):
-@@ -69,16 +68,16 @@ class gsm_receiver_first_blood(gr.top_block):
+@@ -65,20 +64,20 @@ class gsm_receiver_first_blood(gr.top_block):
+         self.sps = self.input_rate / self.gsm_symb_rate / self.options.osr
+ 
+     def _set_filter(self):
+-        filter_cutoff   = 145e3	
++        filter_cutoff   = 145e3
          filter_t_width  = 10e3
          offset = 0
- #        print "input_rate:", self.input_rate, "sample rate:", self.sps, " filter_cutoff:", filter_cutoff, " filter_t_width:", filter_t_width
+-#        print "input_rate:", self.input_rate, "sample rate:", self.sps, " filter_cutoff:", filter_cutoff, " filter_t_width:", filter_t_width
 -        filter_taps     = gr.firdes.low_pass(1.0, self.input_rate, filter_cutoff, filter_t_width, gr.firdes.WIN_HAMMING)
 -        filtr          = gr.freq_xlating_fir_filter_ccf(1, filter_taps, offset, self.input_rate)
-+        filter_taps     = filter.firdes.low_pass(1.0, self.input_rate, filter_cutoff, filter_t_width, filter.firdes.WIN_HAMMING)
-+        filtr          = filter.freq_xlating_fir_filter_ccf(1, filter_taps, offset, self.input_rate)
++        #print "input_rate:", self.input_rate, "sample rate:", self.sps, " filter_cutoff:", filter_cutoff, " filter_t_width:", filter_t_width
++        filter_taps = filter.firdes.low_pass(1.0, self.input_rate, filter_cutoff, filter_t_width, filter.firdes.WIN_HAMMING)
++        filtr = filter.freq_xlating_fir_filter_ccf(1, filter_taps, offset, self.input_rate)
          return filtr
  
      def _set_converter(self):
@@ -290,7 +305,75 @@ index e66ddf9..360aabc 100755
      
      def _set_interpolator(self):
 -        interpolator = gr.fractional_interpolator_cc(0, self.sps) 
-+        interpolator = filter.fractional_resampler_cc(0, self.sps) 
++        interpolator = filter.fractional_resampler_cc(0, self.sps)
          return interpolator
      
      def _set_receiver(self):
+@@ -104,7 +103,7 @@ class gsm_receiver_first_blood(gr.top_block):
+         return (options, args)
+     
+     def set_center_frequency(self, center_freq):
+-        self.filtr.set_center_freq(center_freq)
++        self.filtr.set_center_freq(-center_freq)
+ 
+     def set_timing(self, timing_offset):
+         pass
+diff --git a/gsm-receiver/src/python/gsm_receive_rtl.py b/gsm-receiver/src/python/gsm_receive_rtl.py
+index 926a366..b3f37a9 100755
+--- a/gsm-receiver/src/python/gsm_receive_rtl.py
++++ b/gsm-receiver/src/python/gsm_receive_rtl.py
+@@ -13,7 +13,7 @@
+ 
+ import sys
+ import math
+-from gnuradio import gr, gru, eng_notation, blks2, optfir
++from gnuradio import gr, gru, eng_notation, blocks, filter
+ from gnuradio.eng_option import eng_option
+ from gnuradio.wxgui import fftsink2
+ from gnuradio.wxgui import forms
+@@ -32,7 +32,7 @@ class tune_corrector(gr.feval_dd):
+         self.top_block = top_block
+     def eval(self, freq_offset):
+         self.top_block.offset = self.top_block.offset + int(freq_offset)
+-        self.top_block.tuner.set_center_freq(self.top_block.offset)
++        self.top_block.tuner.set_center_freq(-self.top_block.offset)
+         return freq_offset
+ 
+ class synchronizer(gr.feval_dd):
+@@ -54,12 +54,12 @@ class top_block(grc_wxgui.top_block_gui):
+ 
+     self.tune_corrector_callback = tune_corrector(self)
+     self.synchronizer_callback = synchronizer(self)
+-    self.converter = gr.vector_to_stream(gr.sizeof_float, 142)
++    self.converter = blocks.vector_to_stream(gr.sizeof_float, 142)
+ 
+     self.ifreq = options.frequency
+     self.rfgain = options.gain
+ 
+-    self.src = osmosdr.source_c(options.args)
++    self.src = osmosdr.source(options.args)
+     self.src.set_center_freq(self.ifreq)
+     self.src.set_sample_rate(int(options.sample_rate))
+ 
+@@ -82,17 +82,17 @@ class top_block(grc_wxgui.top_block_gui):
+ 
+     self.offset = 0
+ 
+-    taps = gr.firdes.low_pass(1.0, sample_rate, 145e3, 10e3, gr.firdes.WIN_HANN)
+-    self.tuner = gr.freq_xlating_fir_filter_ccf(1, taps, self.offset, sample_rate)
++    taps = filter.firdes.low_pass(1.0, sample_rate, 145e3, 10e3, filter.firdes.WIN_HANN)
++    self.tuner = filter.freq_xlating_fir_filter_ccf(1, taps, self.offset, sample_rate)
+ 
+-    self.interpolator = gr.fractional_interpolator_cc(0, sps)
++    self.interpolator = filter.fractional_resampler_cc(0, sps)
+ 
+     self.receiver = gsm.receiver_cf(
+         self.tune_corrector_callback, self.synchronizer_callback, 4,
+         options.key.replace(' ', '').lower(),
+         options.configuration.upper())
+ 
+-    self.output = gr.file_sink(gr.sizeof_float, options.output_file)
++    self.output = blocks.file_sink(gr.sizeof_float, options.output_file)
+ 
+     self.connect(self.src, self.tuner, self.interpolator, self.receiver, self.converter, self.output)
+ 
